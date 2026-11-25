@@ -7,7 +7,12 @@ export const ASSETS = {
   backdrop: '/src/assets/images/wedding_backdrop_stage_1795620534879.jpg',
   cottonPaper: '/src/assets/images/cotton_paper_texture_1795620535368.jpg',
   waxSeal: '/src/assets/images/wax_seal_blank_1795620536175.jpg',
+  ambientMusic: '/assets/audio/romantic-wedding.mp3',
 } as const;
+
+export const AMBIENT_MUSIC_URL: string =
+  (import.meta.env.VITE_MUSIC_URL as string | undefined)?.trim() ||
+  ASSETS.ambientMusic;
 
 export const INVITATION_COPY = {
   intro: 'Vous êtes chaleureusement invités à célébrer l’union de',

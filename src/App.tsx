@@ -4,11 +4,14 @@ import {
   Maximize2,
   MessageCircle,
   Minimize2,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { InvitationStage } from './components/InvitationStage';
 import { RsvpSubmission } from './components/RsvpSection';
 import { ScrollableInvitation } from './components/ScrollableInvitation';
 import {
+  AMBIENT_MUSIC_URL,
   ASSETS,
   INVITATION_COPY,
   STAGE_HEIGHT,
@@ -21,6 +24,7 @@ import { loadTransparentWaxSeal } from './utils/processWaxSeal';
 
 const RSVP_STORAGE_KEY = 'mourad_dounia_rsvp_v1';
 const ENVELOPE_HANDOFF_TIME = 8.4;
+const TARGET_MUSIC_VOLUME = 0.36;
 
 type ExperiencePhase = 'welcome' | 'opening' | 'scrollable';
 
@@ -33,6 +37,8 @@ export default function App() {
   const [time, setTime] = useState<number>(0);
   const [ambientTime, setAmbientTime] = useState<number>(0);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [isMusicPlaying, setIsMusicPlaying] = useState<boolean>(false);
   const [savedRsvp, setSavedRsvp] = useState<RsvpSubmission | null>(() => {
     try {
       const raw = localStorage.getItem(RSVP_STORAGE_KEY);
@@ -48,6 +54,8 @@ export default function App() {
   const [stageScale, setStageScale] = useState<number>(0.42);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const frameContainerRef = useRef<HTMLDivElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const fadeRafRef = useRef<number | null>(null);
   const timeRef = useRef<number>(time);
   const ambientTimeRef = useRef<number>(ambientTime);
   const rafRef = useRef<number | null>(null);
@@ -60,6 +68,44 @@ export default function App() {
   useEffect(() => {
     ambientTimeRef.current = ambientTime;
   }, [ambientTime]);
+
+  const fadeVolumeTo = useCallback((targetVol: number, durationMs = 1400) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (fadeRafRef.current !== null) {
+      cancelAnimationFrame(fadeRafRef.current);
+      fadeRafRef.current = null;
+    }
+    const startVol = audio.volume;
+    const startTs = performance.now();
+    const step = (now: number) => {
+      const p = Math.min(1, (now - startTs) / durationMs);
+      const eased = 1 - Math.pow(1 - p, 3);
+      try {
+        audio.volume = Math.max(
+          0,
+          Math.min(1, startVol + (targetVol - startVol) * eased)
+        );
+      } catch {
+        // iOS Safari treats audio.volume as read-only
+      }
+      if (p < 1) {
+        fadeRafRef.current = requestAnimationFrame(step);
+      } else {
+        fadeRafRef.current = null;
+      }
+    };
+    fadeRafRef.current = requestAnimationFrame(step);
+  }, []);
+
+  // Cleanup audio fade animation on unmount
+  useEffect(() => {
+    return () => {
+      if (fadeRafRef.current !== null) {
+        cancelAnimationFrame(fadeRafRef.current);
+      }
+    };
+  }, []);
 
   // Pre-process luxury paper & wax seal transparency once on mount
   useEffect(() => {
@@ -145,6 +191,47 @@ export default function App() {
     };
   }, [phase, prefersReducedMotion]);
 
+  // Automatically trigger romantic ambient music as soon as the envelope finishes opening
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (phase === 'scrollable') {
+      if (isMuted) {
+        audio.muted = true;
+        return;
+      }
+      audio.muted = false;
+      if (audio.paused) {
+        try {
+          audio.currentTime = 0;
+        } catch {
+          // Ignore if metadata not loaded yet
+        }
+        audio
+          .play()
+          .then(() => {
+            setIsMusicPlaying(true);
+            fadeVolumeTo(TARGET_MUSIC_VOLUME, 1600);
+          })
+          .catch(() => {
+            setIsMusicPlaying(false);
+          });
+      } else {
+        setIsMusicPlaying(true);
+        fadeVolumeTo(TARGET_MUSIC_VOLUME, 1600);
+      }
+    } else if (phase === 'welcome') {
+      audio.pause();
+      try {
+        audio.currentTime = 0;
+      } catch {
+        // Ignore
+      }
+      setIsMusicPlaying(false);
+    }
+  }, [phase, isMuted, fadeVolumeTo]);
+
   useEffect(() => {
     const onFsChange = () => {
       setIsFullscreen(Boolean(document.fullscreenElement));
@@ -153,8 +240,23 @@ export default function App() {
     return () => document.removeEventListener('fullscreenchange', onFsChange);
   }, []);
 
+  const primeAmbientAudio = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    // Unlock audio inside user tap while keeping it silent until the envelope finishes opening
+    audio.muted = true;
+    try {
+      audio.volume = 0;
+      audio.currentTime = 0;
+    } catch {
+      // Ignore read-only volume on iOS
+    }
+    audio.play().catch(() => {});
+  }, []);
+
   const handleEnter = useCallback(() => {
     if (phase !== 'welcome') return;
+    primeAmbientAudio();
     if (prefersReducedMotion) {
       setTime(TOTAL_DURATION);
       setAmbientTime(TOTAL_DURATION);
@@ -165,7 +267,7 @@ export default function App() {
       setAmbientTime(4.8);
       setPhase('opening');
     }
-  }, [phase, prefersReducedMotion]);
+  }, [phase, prefersReducedMotion, primeAmbientAudio]);
 
   const handleSkipToScrollable = useCallback(() => {
     setTime(ENVELOPE_HANDOFF_TIME);
@@ -173,6 +275,16 @@ export default function App() {
   }, []);
 
   const handleReplayOpening = useCallback(() => {
+    const audio = audioRef.current;
+    if (audio) {
+      audio.muted = true;
+      try {
+        audio.volume = 0;
+        audio.currentTime = 0;
+      } catch {
+        // Ignore
+      }
+    }
     if (prefersReducedMotion) {
       setTime(0);
       setPhase('welcome');
@@ -182,6 +294,31 @@ export default function App() {
     setAmbientTime(4.8);
     setPhase('opening');
   }, [prefersReducedMotion]);
+
+  const handleToggleMute = useCallback(() => {
+    const audio = audioRef.current;
+    setIsMuted((prev) => {
+      const nextMuted = !prev;
+      if (audio) {
+        audio.muted = nextMuted;
+        if (!nextMuted && phase === 'scrollable') {
+          if (audio.paused) {
+            audio
+              .play()
+              .then(() => {
+                setIsMusicPlaying(true);
+                fadeVolumeTo(TARGET_MUSIC_VOLUME, 600);
+              })
+              .catch(() => {});
+          } else {
+            setIsMusicPlaying(true);
+            fadeVolumeTo(TARGET_MUSIC_VOLUME, 600);
+          }
+        }
+      }
+      return nextMuted;
+    });
+  }, [phase, fadeVolumeTo]);
 
   const handleRsvpSubmit = useCallback((data: RsvpSubmission) => {
     setSavedRsvp(data);
@@ -214,13 +351,58 @@ export default function App() {
       ref={frameContainerRef}
       className="h-dvh w-screen overflow-hidden flex flex-col bg-[#0B1325] text-[#F5EDE0]"
     >
-      {/* French Invitation Header */}
-      <header className="shrink-0 w-full flex items-center justify-between px-4 py-2.5 border-b border-[#C89D4C]/20 bg-[#0D172E]/95 z-30">
-        <div className="w-9 sm:w-20" aria-hidden="true" />
-        <p className="font-luxury-serif text-[18px] sm:text-[22px] font-medium tracking-[0.16em] uppercase text-[#F2DFB4] m-0 text-center">
+      {/* Background romantic MP3 ambient track */}
+      <audio
+        ref={audioRef}
+        src={AMBIENT_MUSIC_URL}
+        loop
+        preload="auto"
+        playsInline
+        aria-hidden="true"
+      />
+
+      {/* French Invitation Header with Accessible Mute Button */}
+      <header className="shrink-0 w-full flex items-center justify-between px-3 sm:px-4 py-2.5 border-b border-[#C89D4C]/20 bg-[#0D172E]/95 z-30">
+        <div className="flex items-center justify-start w-20 sm:w-28">
+          <button
+            type="button"
+            onClick={handleToggleMute}
+            aria-pressed={isMuted}
+            aria-label={
+              isMuted
+                ? "Activer la musique d'ambiance"
+                : 'Mettre la musique en sourdine'
+            }
+            title={
+              isMuted
+                ? "Activer la musique d'ambiance"
+                : 'Mettre la musique en sourdine'
+            }
+            className="inline-flex items-center justify-center gap-1.5 min-h-[36px] px-2.5 py-1.5 rounded-lg border border-[#C89D4C]/30 bg-[#142344]/80 hover:bg-[#1E2F54] text-[#F2DFB4] text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E8CE8E] cursor-pointer"
+          >
+            {isMuted ? (
+              <VolumeX className="w-4 h-4 text-[#CFC3B0]" aria-hidden="true" />
+            ) : (
+              <Volume2
+                className={`w-4 h-4 ${
+                  isMusicPlaying && phase === 'scrollable'
+                    ? 'text-[#E8CE8E] animate-pulse'
+                    : 'text-[#E4C278]'
+                }`}
+                aria-hidden="true"
+              />
+            )}
+            <span className="hidden sm:inline text-[11px] tracking-[0.04em]">
+              {isMuted ? 'Muet' : 'Son'}
+            </span>
+          </button>
+        </div>
+
+        <p className="font-luxury-serif text-[17px] sm:text-[22px] font-medium tracking-[0.14em] sm:tracking-[0.16em] uppercase text-[#F2DFB4] m-0 text-center truncate px-2">
           {INVITATION_COPY.pageTitle}
         </p>
-        <div className="flex items-center justify-end gap-1.5 w-9 sm:w-20">
+
+        <div className="flex items-center justify-end gap-1.5 w-20 sm:w-28">
           <a
             href={getWhatsAppShareUrl(
               typeof window !== 'undefined' ? window.location.href : ''
@@ -228,14 +410,14 @@ export default function App() {
             target="_blank"
             rel="noopener noreferrer"
             aria-label={INVITATION_COPY.shareWhatsappLabel}
-            className="hidden sm:inline-flex items-center justify-center min-h-[36px] min-w-[36px] p-1.5 rounded-lg text-[#E4C278] hover:bg-[#19294B] transition-colors"
+            className="hidden sm:inline-flex items-center justify-center min-h-[36px] min-w-[36px] p-1.5 rounded-lg text-[#E4C278] hover:bg-[#19294B] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E8CE8E]"
           >
             <MessageCircle className="w-4 h-4" />
           </a>
           <button
             type="button"
             onClick={handleFullscreen}
-            className="inline-flex items-center justify-center min-h-[36px] min-w-[36px] p-1.5 rounded-lg text-[#CFC3B0] hover:bg-[#1E2F54] transition-colors cursor-pointer"
+            className="inline-flex items-center justify-center min-h-[36px] min-w-[36px] p-1.5 rounded-lg text-[#CFC3B0] hover:bg-[#1E2F54] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E8CE8E] cursor-pointer"
             aria-label={isFullscreen ? 'Quitter le plein écran' : 'Plein écran'}
           >
             {isFullscreen ? (
