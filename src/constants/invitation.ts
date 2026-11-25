@@ -9,7 +9,7 @@ export const ASSETS = {
   waxSeal: '/src/assets/images/wax_seal_blank_1795620536175.jpg',
 } as const;
 
-export const YOUTUBE_VIDEO_ID = 'UIPrqrYfUuc';
+export const YOUTUBE_VIDEO_ID = '2Vv-BfVoq4g';
 
 export const INVITATION_COPY = {
   intro: 'Vous êtes chaleureusement invités à célébrer l’union de',
