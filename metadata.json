@@ -1,0 +1,6 @@
+{
+  "name": "Mourad & Dounia — Faire-part de Mariage",
+  "description": "Faire-part de mariage animé au format vertical 9:16 pour Mourad & Dounia, le 28 janvier 2027 à Oran.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

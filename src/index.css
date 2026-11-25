@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-serif: "Cormorant Garamond", Georgia, serif;
+    --font-script: "Great Vibes", cursive;
+    --font-ui: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: #ece4d8;
+    color: #2c241e;
+    font-family: var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+.font-luxury-serif {
+  font-family: var(--font-serif);
+}
+
+.font-luxury-script {
+  font-family: var(--font-script);
+}
+
+.font-studio-ui {
+  font-family: var(--font-ui);
+}
+
+@keyframes goldShimmerSweep {
+  0% {
+    background-position: -140% 0;
+  }
+  100% {
+    background-position: 240% 0;
+  }
+}
