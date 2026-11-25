@@ -25,7 +25,32 @@ export const INVITATION_COPY = {
   rsvpLabel: 'Confirmer ma présence',
   shareWhatsappLabel: 'Envoyer sur WhatsApp',
   directionsLabel: "Voir l'itinéraire",
+  scrollHint: 'Faites défiler vers le bas',
 } as const;
+
+// Jeudi 28 janvier 2027 à 18h30 (UTC+1 Oran)
+export const WEDDING_TARGET_DATE = '2027-01-28T18:30:00+01:00';
+
+export const EVENING_SCHEDULE = [
+  {
+    time: '18:30',
+    title: 'Accueil des invités',
+    subtitle: 'Installation & cocktail de bienvenue',
+    icon: 'welcome',
+  },
+  {
+    time: '20:00',
+    title: 'Dîner de réception',
+    subtitle: 'Partage & célébration en famille',
+    icon: 'dinner',
+  },
+  {
+    time: '22:30',
+    title: 'Pièce montée & soirée',
+    subtitle: 'Musique, danse & souvenirs pour la vie',
+    icon: 'party',
+  },
+] as const;
 
 export const WHATSAPP_CONTACT_E164 = '33666418885';
 export const WHATSAPP_CONTACT_DISPLAY = '+33 6 66 41 88 85';
