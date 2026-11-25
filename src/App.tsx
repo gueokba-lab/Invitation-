@@ -8,7 +8,10 @@ import {
 import { InvitationStage } from './components/InvitationStage';
 import { RsvpSubmission } from './components/RsvpSection';
 import { ScrollableInvitation } from './components/ScrollableInvitation';
-import { YouTubeMusicPlayer } from './components/YouTubeMusicPlayer';
+import {
+  YouTubeMusicPlayer,
+  YouTubeMusicPlayerHandle,
+} from './components/YouTubeMusicPlayer';
 import {
   ASSETS,
   INVITATION_COPY,
@@ -49,6 +52,7 @@ export default function App() {
   const [stageScale, setStageScale] = useState<number>(0.42);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const frameContainerRef = useRef<HTMLDivElement | null>(null);
+  const musicPlayerRef = useRef<YouTubeMusicPlayerHandle | null>(null);
   const timeRef = useRef<number>(time);
   const ambientTimeRef = useRef<number>(ambientTime);
   const rafRef = useRef<number | null>(null);
@@ -156,6 +160,8 @@ export default function App() {
 
   const handleEnter = useCallback(() => {
     if (phase !== 'welcome') return;
+    // Start YouTube soundtrack immediately on the guest's first interaction entering the invitation
+    musicPlayerRef.current?.startPlayback();
     if (prefersReducedMotion) {
       setTime(TOTAL_DURATION);
       setAmbientTime(TOTAL_DURATION);
@@ -218,7 +224,7 @@ export default function App() {
       {/* French Invitation Header with Persistent YouTube Music Toggle */}
       <header className="shrink-0 w-full flex items-center justify-between px-3 sm:px-4 py-2.5 border-b border-[#C89D4C]/20 bg-[#0D172E]/95 z-30">
         <div className="flex items-center justify-start w-20 sm:w-28">
-          <YouTubeMusicPlayer />
+          <YouTubeMusicPlayer ref={musicPlayerRef} />
         </div>
 
         <p className="font-luxury-serif text-[17px] sm:text-[22px] font-medium tracking-[0.14em] sm:tracking-[0.16em] uppercase text-[#F2DFB4] m-0 text-center truncate px-2">

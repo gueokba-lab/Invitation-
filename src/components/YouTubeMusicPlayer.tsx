@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 import { Music, Pause, Play, X } from 'lucide-react';
 import { YOUTUBE_VIDEO_ID } from '../constants/invitation';
 
@@ -85,17 +92,23 @@ function loadYouTubeIframeApi(): Promise<YTNamespace> {
   return ytApiPromise;
 }
 
-export const YouTubeMusicPlayer: React.FC = () => {
-  const hostRef = useRef<HTMLDivElement | null>(null);
-  const playerRef = useRef<YTPlayerInstance | null>(null);
-  const pendingPlayRef = useRef<boolean>(false);
-  const blockCheckTimerRef = useRef<number | null>(null);
-  const isPlayingRef = useRef<boolean>(false);
+export interface YouTubeMusicPlayerHandle {
+  startPlayback: () => void;
+}
 
-  const [isReady, setIsReady] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isBuffering, setIsBuffering] = useState(false);
-  const [showMobileFallback, setShowMobileFallback] = useState(false);
+export const YouTubeMusicPlayer = forwardRef<YouTubeMusicPlayerHandle>(
+  function YouTubeMusicPlayer(_props, ref) {
+    const hostRef = useRef<HTMLDivElement | null>(null);
+    const playerRef = useRef<YTPlayerInstance | null>(null);
+    const pendingPlayRef = useRef<boolean>(false);
+    const userPausedRef = useRef<boolean>(false);
+    const blockCheckTimerRef = useRef<number | null>(null);
+    const isPlayingRef = useRef<boolean>(false);
+
+    const [isReady, setIsReady] = useState(false);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [isBuffering, setIsBuffering] = useState(false);
+    const [showMobileFallback, setShowMobileFallback] = useState(false);
 
   useEffect(() => {
     isPlayingRef.current = isPlaying;
@@ -192,26 +205,13 @@ export const YouTubeMusicPlayer: React.FC = () => {
     };
   }, []);
 
-  const handleTogglePlay = useCallback(() => {
-    const player = playerRef.current;
-
-    if (isPlayingRef.current) {
-      pendingPlayRef.current = false;
-      if (blockCheckTimerRef.current !== null) {
-        window.clearTimeout(blockCheckTimerRef.current);
-        blockCheckTimerRef.current = null;
-      }
-      try {
-        player?.pauseVideo();
-      } catch {
-        // Ignore
-      }
-      setIsPlaying(false);
-      setIsBuffering(false);
+  const startPlayback = useCallback(() => {
+    // Do not restart if already playing or if the guest intentionally paused
+    if (isPlayingRef.current || userPausedRef.current) {
       return;
     }
 
-    // Start playback strictly on explicit guest click
+    const player = playerRef.current;
     if (!player || !isReady) {
       pendingPlayRef.current = true;
       setIsBuffering(true);
@@ -239,6 +239,38 @@ export const YouTubeMusicPlayer: React.FC = () => {
       setShowMobileFallback(true);
     }
   }, [isReady]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      startPlayback,
+    }),
+    [startPlayback]
+  );
+
+  const handleTogglePlay = useCallback(() => {
+    const player = playerRef.current;
+
+    if (isPlayingRef.current) {
+      pendingPlayRef.current = false;
+      userPausedRef.current = true;
+      if (blockCheckTimerRef.current !== null) {
+        window.clearTimeout(blockCheckTimerRef.current);
+        blockCheckTimerRef.current = null;
+      }
+      try {
+        player?.pauseVideo();
+      } catch {
+        // Ignore
+      }
+      setIsPlaying(false);
+      setIsBuffering(false);
+      return;
+    }
+
+    userPausedRef.current = false;
+    startPlayback();
+  }, [startPlayback]);
 
   return (
     <div className="relative flex items-center">
@@ -330,4 +362,4 @@ export const YouTubeMusicPlayer: React.FC = () => {
       </div>
     </div>
   );
-};
+});
